@@ -1,0 +1,6 @@
+[package]
+name = "smartsheet"
+version = "0.1.0"
+authors = ["Igor Żuk <igor.zuk@anixe.pl>"]
+
+[dependencies]
