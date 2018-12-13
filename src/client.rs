@@ -1,5 +1,5 @@
 use {Result, SheetId};
-use dto::{Error, IndexResult, Sheet, SheetForList};
+use dto::{ApiResult, Error, IndexResult, Row, Sheet, SheetHeader};
 use reqwest::{Client as ReqwestClient, RequestBuilder};
 use serde::de::DeserializeOwned;
 use serde_json;
@@ -26,17 +26,25 @@ impl Client {
         }
     }
 
-    pub fn fetch_sheet(&self, id: SheetId) -> Result<Sheet> {
+    pub fn fetch_sheet(&self, id: &SheetId) -> Result<Sheet> {
         let builder = ReqwestClient::new()
             .get(&format!("{}/sheets/{}", self.url, id));
         self.get_json(builder)
     }
 
-    pub fn fetch_sheets(&self) -> Result<IndexResult<SheetForList>> {
+    pub fn fetch_sheets(&self) -> Result<IndexResult<SheetHeader>> {
         let builder = ReqwestClient::new()
             .get(&format!("{}/sheets", self.url))
             .query(QUERY_DO_NOT_PAGINATE);
         self.get_json(builder)
+    }
+
+    pub fn update_cell(&self, sheet_id: &SheetId, row: Row) -> Result<Vec<Row>> {
+        let builder = ReqwestClient::new()
+            .put(&format!("{}/sheets/{}/rows", self.url, sheet_id))
+            .json(&row);
+        let result: ApiResult<_> = self.get_json(builder)?;
+        Ok(result.result)
     }
 
     fn get_json<T: DeserializeOwned>(&self, builder: RequestBuilder) -> Result<T> {
@@ -92,7 +100,7 @@ mod tests {
                 let result = client.fetch_sheets();
 
                 mock.assert();
-                let _: IndexResult<SheetForList> = result.unwrap();
+                assert!(result.is_ok());
             }
         }
 

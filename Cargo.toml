@@ -8,6 +8,10 @@ reqwest = "0.9.5"
 serde = "1.0.80"
 serde_derive = "1.0.80"
 serde_json = "1.0.33"
+lazy_static = { version = "1.2.0", optional = true }
 
 [dev-dependencies]
 mockito = "0.13.0"
+
+[features]
+run_real_service_tests = ["lazy_static"]
