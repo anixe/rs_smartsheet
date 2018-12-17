@@ -51,58 +51,58 @@ mod tests {
     fn mock_sheets() -> Mock {
         mockito::mock("GET", "/sheets?includeAll=true")
             .match_header("authorization", "Bearer TEST_TOKEN")
-            .with_body(r#"{
+            .with_body(json!({
                         "data": [
                             {
                                 "id": 11,
                                 "name": "my_sheet"
                             }
                         ]
-                    }"#)
+                    }).to_string())
             .create()
     }
 
     fn mock_sheet() -> Mock {
         mockito::mock("GET", "/sheets/11")
             .match_header("authorization", "Bearer TEST_TOKEN")
-            .with_body(r#"{
-                            "id": 11,
-                            "name": "my_sheet",
-                            "columns": [
+            .with_body(json!({
+                    "id": 11,
+                    "name": "my_sheet",
+                    "columns": [
+                        {
+                            "id": 21,
+                            "title": "my_column"
+                        },
+                        {
+                            "id": 22,
+                            "title": "other_column"
+                        }
+                    ],
+                    "rows": [
+                        {
+                            "id": 31,
+                            "cells": [
                                 {
-                                    "id": 21,
-                                    "title": "my_column"
+                                    "columnId": 21,
+                                    "value": "data_21_31"
                                 },
                                 {
-                                    "id": 22,
-                                    "title": "other_column"
-                                }
-                            ],
-                            "rows": [
-                                {
-                                    "id": 31,
-                                    "cells": [
-                                        {
-                                            "columnId": 21,
-                                            "value": "data_21_31"
-                                        },
-                                        {
-                                            "columnId": 22,
-                                            "value": "data_22_31"
-                                        }
-                                    ]
-                                },
-                                {
-                                    "id": 32,
-                                    "cells": [
-                                        {
-                                            "columnId": 21,
-                                            "value": "data_21_32"
-                                        }
-                                    ]
+                                    "columnId": 22,
+                                    "value": "data_22_31"
                                 }
                             ]
-                        }"#)
+                        },
+                        {
+                            "id": 32,
+                            "cells": [
+                                {
+                                    "columnId": 21,
+                                    "value": "data_21_32"
+                                }
+                            ]
+                        }
+                    ]
+                }).to_string())
             .create()
     }
 
@@ -247,7 +247,7 @@ mod tests {
                         }
                     ]
                 })))
-                .with_body(r#"{
+                .with_body(json!({
                        "result": [
                             {
                                 "id": 31,
@@ -263,7 +263,7 @@ mod tests {
                                 ]
                             }
                        ]
-                    }"#)
+                    }).to_string())
                 .create();
             let column_id = &ColumnId::from(21);
             let row_id = &RowId::from(31);

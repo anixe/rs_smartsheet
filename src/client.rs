@@ -93,7 +93,7 @@ mod tests {
         fn returns_all_sheets() {
             let mock = mockito::mock("GET", "/sheets?includeAll=true")
                 .match_header("authorization", "Bearer TEST_TOKEN")
-                .with_body(r#"{
+                .with_body(json!({
                         "data": [
                             {
                                 "id": 11,
@@ -104,7 +104,7 @@ mod tests {
                                 "name": "my_other_sheet"
                             }
                         ]
-                    }"#)
+                    }).to_string())
                 .create();
             let client = Client::new_mocked();
 
@@ -127,9 +127,9 @@ mod tests {
         fn returns_all_sheets() {
             let mock = mockito::mock("GET", "/new_route")
                 .match_header("authorization", "Bearer TEST_TOKEN")
-                .with_body(r#"{
+                .with_body(json!({
                         "result": null
-                    }"#)
+                    }).to_string())
                 .create();
             let client = Client::new_mocked();
 
@@ -148,18 +148,18 @@ mod tests {
             let mock = mockito::mock("POST", "/new_route")
                 .match_header("authorization", "Bearer TEST_TOKEN")
                 .match_header("content-type", "application/json")
-                .match_body(Matcher::Json(serde_json::from_str(r#"{
+                .match_body(Matcher::Json(json!({
                         "key": "value"
-                    }"#).unwrap()))
-                .with_body(r#"{
+                    })))
+                .with_body(json!({
                         "result": null
-                    }"#)
+                    }).to_string())
                 .create();
             let client = Client::new_mocked();
 
-            let result = client.post_json::<_, ApiResult<()>>("new_route", &serde_json::from_str::<serde_json::Value>(r#"{
+            let result = client.post_json::<_, ApiResult<()>>("new_route", &json!({
                     "key": "value"
-                }"#).unwrap());
+                }));
 
             mock.assert();
             result.unwrap();
@@ -168,12 +168,13 @@ mod tests {
 
     mod fetch_json {
         use super::*;
+        use serde_json::Value;
 
-        fn create_sheets_mock(with_status: usize, with_body: &str) -> Mock {
+        fn create_sheets_mock(with_status: usize, with_body: Value) -> Mock {
             mockito::mock("GET", "/sheets?includeAll=true")
                 .match_header("authorization", "Bearer TEST_TOKEN")
                 .with_status(with_status)
-                .with_body(with_body)
+                .with_body(with_body.to_string())
                 .create()
         }
 
@@ -182,14 +183,14 @@ mod tests {
 
             #[test]
             fn then_returns_dto() {
-                let mock = create_sheets_mock(200, r#"{
+                let mock = create_sheets_mock(200, json!({
                         "data": [
                             {
                                 "id": 123,
                                 "name": "my_sheet"
                             }
                         ]
-                    }"#);
+                    }));
                 let client = Client::new_mocked();
 
                 let result = client.fetch_sheets();
@@ -204,10 +205,10 @@ mod tests {
 
             #[test]
             fn then_returns_error() {
-                let mock = create_sheets_mock(500, r#"{
+                let mock = create_sheets_mock(500, json!({
                         "errorCode": 4004,
                         "message": "Test error"
-                    }"#);
+                    }));
                 let client = Client::new_mocked();
 
                 let result = client.fetch_sheets();
@@ -227,16 +228,16 @@ mod tests {
 
             #[test]
             fn then_returns_error() {
-                let mock = create_sheets_mock(200, r#"{
+                let mock = create_sheets_mock(200, json!({
                         "Unexpected": "data"
-                    }"#);
+                    }));
                 let client = Client::new_mocked();
 
                 let result = client.fetch_sheets();
 
                 mock.assert();
                 let actual = result.unwrap_err();
-                let expected = ResError::InvalidJson("missing field `data` at line 3 column 21".to_string());
+                let expected = ResError::InvalidJson("missing field `data` at line 1 column 21".to_string());
                 assert_eq!(expected, actual);
             }
         }
