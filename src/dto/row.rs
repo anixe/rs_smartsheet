@@ -24,4 +24,8 @@ impl Row {
     pub fn get_row_id(&self) -> RowId {
         self.id.clone()
     }
+
+    pub fn get_cells_iter(&self) -> impl Iterator<Item = &Cell> {
+        self.cells.iter()
+    }
 }

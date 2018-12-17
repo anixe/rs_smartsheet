@@ -18,7 +18,7 @@ mod sheet_id;
 mod smartsheet;
 
 pub use self::client::Client;
-pub use self::dto::{CellValue, Row, SheetHeader};
+pub use self::dto::{Cell, CellValue, Row, SheetHeader};
 pub use self::column_id::ColumnId;
 pub use self::error::Error;
 pub use self::row_id::RowId;

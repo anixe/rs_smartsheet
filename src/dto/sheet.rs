@@ -39,6 +39,10 @@ impl Sheet {
         self.rows.get(row_id)?
             .get_cell_value(column_id)
     }
+
+    pub fn get_rows_iter(&self) -> impl Iterator<Item = &Row> {
+        self.rows.values()
+    }
 }
 
 fn deserialize_rows<'de, D: Deserializer<'de>>(deserializer: D) -> Result<BTreeMap<RowId, Row>, D::Error> {
