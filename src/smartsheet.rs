@@ -10,7 +10,6 @@ pub struct Smartsheet {
 impl Smartsheet {
     pub fn fetch(client: &Client, sheet_name: &str) -> Result<Smartsheet> {
         let sheet_id = client.fetch_sheets()?
-            .into_data()
             .iter()
             .find(|sheet| sheet.get_name() == sheet_name)
             .ok_or_else(|| Error::InvalidSheetName(sheet_name.to_string()))?

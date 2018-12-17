@@ -26,28 +26,29 @@ impl Client {
         }
     }
 
-    pub fn fetch_sheet(&self, id: &SheetId) -> Result<Sheet> {
+    crate fn fetch_sheet(&self, id: &SheetId) -> Result<Sheet> {
         let builder = ReqwestClient::new()
             .get(&format!("{}/sheets/{}", self.url, id));
-        self.get_json(builder)
+        self.fetch_json(builder)
     }
 
-    pub fn fetch_sheets(&self) -> Result<IndexResult<SheetHeader>> {
+    pub fn fetch_sheets(&self) -> Result<Vec<SheetHeader>> {
         let builder = ReqwestClient::new()
             .get(&format!("{}/sheets", self.url))
             .query(QUERY_DO_NOT_PAGINATE);
-        self.get_json(builder)
+        let result: IndexResult<_> = self.fetch_json(builder)?;
+        Ok(result.into_data())
     }
 
-    pub fn update_cell(&self, sheet_id: &SheetId, row: Row) -> Result<Vec<Row>> {
+    crate fn update_cell(&self, sheet_id: &SheetId, row: Row) -> Result<Vec<Row>> {
         let builder = ReqwestClient::new()
             .put(&format!("{}/sheets/{}/rows", self.url, sheet_id))
             .json(&row);
-        let result: ApiResult<_> = self.get_json(builder)?;
+        let result: ApiResult<_> = self.fetch_json(builder)?;
         Ok(result.result)
     }
 
-    fn get_json<T: DeserializeOwned>(&self, builder: RequestBuilder) -> Result<T> {
+    fn fetch_json<T: DeserializeOwned>(&self, builder: RequestBuilder) -> Result<T> {
         let response = builder.bearer_auth(&self.token)
             .send()?;
         if !response.status().is_success() {
@@ -71,7 +72,7 @@ mod tests {
     use Error as ResError;
     use mockito::{self, Mock};
 
-    mod get_json {
+    mod fetch_json {
         use super::*;
 
         fn create_sheets_mock(with_status: usize, with_body: &str) -> Mock {
@@ -162,6 +163,40 @@ mod tests {
                     _ => panic!("Invalid error: '{:?}'", actual),
                 }
             }
+        }
+    }
+
+    mod fetch_sheets {
+        use super::*;
+
+        #[test]
+        fn returns_all_sheets() {
+            let mock = mockito::mock("GET", "/sheets?includeAll=true")
+                .match_header("authorization", "Bearer TEST_TOKEN")
+                .with_body(r#"{
+                        "data": [
+                            {
+                                "id": 11,
+                                "name": "my_sheet"
+                            },
+                            {
+                                "id": 12,
+                                "name": "my_other_sheet"
+                            }
+                        ]
+                    }"#)
+                .create();
+            let client = Client::new_mocked();
+
+            let result = client.fetch_sheets();
+
+            mock.assert();
+            let actual = result.unwrap();
+            assert_eq!(2, actual.len());
+            assert_eq!("my_sheet", actual[0].get_name());
+            assert_eq!(SheetId::from(11), actual[0].get_sheet_id());
+            assert_eq!("my_other_sheet", actual[1].get_name());
+            assert_eq!(SheetId::from(12), actual[1].get_sheet_id());
         }
     }
 }

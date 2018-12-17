@@ -1,3 +1,5 @@
+#![feature(crate_visibility_modifier)]
+
 #[cfg(test)]
 extern crate mockito;
 extern crate reqwest;
@@ -16,11 +18,11 @@ mod sheet_id;
 mod smartsheet;
 
 pub use self::client::Client;
-pub use self::dto::{CellValue, Row};
+pub use self::dto::{CellValue, Row, SheetHeader};
 pub use self::column_id::ColumnId;
 pub use self::error::Error;
 pub use self::row_id::RowId;
 pub use self::sheet_id::SheetId;
 pub use self::smartsheet::Smartsheet;
 
-type Result<T> = ::std::result::Result<T, Error>;
+pub type Result<T> = ::std::result::Result<T, Error>;
