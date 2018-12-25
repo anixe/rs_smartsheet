@@ -1,12 +1,12 @@
 use SheetId;
 
 #[derive(Debug, Deserialize)]
-pub struct SheetForList {
+pub struct SheetHeader {
     id: SheetId,
     name: String
 }
 
-impl SheetForList {
+impl SheetHeader {
     pub fn get_name(&self) -> &str {
         &self.name
     }

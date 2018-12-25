@@ -1,6 +1,7 @@
 use {Result, SheetId};
-use dto::{Error, IndexResult, Sheet, SheetForList};
+use dto::{ApiResult, Error, IndexResult, Row, Sheet, SheetHeader};
 use reqwest::{Client as ReqwestClient, RequestBuilder};
+use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json;
 use std::rc::Rc;
@@ -26,20 +27,42 @@ impl Client {
         }
     }
 
-    pub fn fetch_sheet(&self, id: SheetId) -> Result<Sheet> {
+    crate fn fetch_sheet(&self, id: &SheetId) -> Result<Sheet> {
         let builder = ReqwestClient::new()
             .get(&format!("{}/sheets/{}", self.url, id));
-        self.get_json(builder)
+        self.fetch_json(builder)
     }
 
-    pub fn fetch_sheets(&self) -> Result<IndexResult<SheetForList>> {
+    pub fn fetch_sheets(&self) -> Result<Vec<SheetHeader>> {
         let builder = ReqwestClient::new()
             .get(&format!("{}/sheets", self.url))
             .query(QUERY_DO_NOT_PAGINATE);
-        self.get_json(builder)
+        let result: IndexResult<_> = self.fetch_json(builder)?;
+        Ok(result.into_data())
     }
 
-    fn get_json<T: DeserializeOwned>(&self, builder: RequestBuilder) -> Result<T> {
+    crate fn update_cell(&self, sheet_id: &SheetId, row: Row) -> Result<Vec<Row>> {
+        let builder = ReqwestClient::new()
+            .put(&format!("{}/sheets/{}/rows", self.url, sheet_id))
+            .json(&row);
+        let result: ApiResult<_> = self.fetch_json(builder)?;
+        Ok(result.result)
+    }
+
+    pub fn get_json<T: DeserializeOwned>(&self, urn: &str) -> Result<T> {
+        let builder = ReqwestClient::new()
+            .get(&format!("{}/{}", self.url, urn));
+        self.fetch_json(builder)
+    }
+
+    pub fn post_json<S: Serialize + ?Sized, T: DeserializeOwned>(&self, urn: &str, body: &S) -> Result<T> {
+        let builder = ReqwestClient::new()
+            .post(&format!("{}/{}", self.url, urn))
+            .json(body);
+        self.fetch_json(builder)
+    }
+
+    fn fetch_json<T: DeserializeOwned>(&self, builder: RequestBuilder) -> Result<T> {
         let response = builder.bearer_auth(&self.token)
             .send()?;
         if !response.status().is_success() {
@@ -61,16 +84,97 @@ impl Client {
 mod tests {
     use super::*;
     use Error as ResError;
-    use mockito::{self, Mock};
+    use mockito::{self, Matcher, Mock};
+
+    mod fetch_sheets {
+        use super::*;
+
+        #[test]
+        fn returns_all_sheets() {
+            let mock = mockito::mock("GET", "/sheets?includeAll=true")
+                .match_header("authorization", "Bearer TEST_TOKEN")
+                .with_body(json!({
+                        "data": [
+                            {
+                                "id": 11,
+                                "name": "my_sheet"
+                            },
+                            {
+                                "id": 12,
+                                "name": "my_other_sheet"
+                            }
+                        ]
+                    }).to_string())
+                .create();
+            let client = Client::new_mocked();
+
+            let result = client.fetch_sheets();
+
+            mock.assert();
+            let actual = result.unwrap();
+            assert_eq!(2, actual.len());
+            assert_eq!("my_sheet", actual[0].get_name());
+            assert_eq!(SheetId::from(11), actual[0].get_sheet_id());
+            assert_eq!("my_other_sheet", actual[1].get_name());
+            assert_eq!(SheetId::from(12), actual[1].get_sheet_id());
+        }
+    }
 
     mod get_json {
         use super::*;
 
-        fn create_sheets_mock(with_status: usize, with_body: &str) -> Mock {
+        #[test]
+        fn returns_all_sheets() {
+            let mock = mockito::mock("GET", "/new_route")
+                .match_header("authorization", "Bearer TEST_TOKEN")
+                .with_body(json!({
+                        "result": null
+                    }).to_string())
+                .create();
+            let client = Client::new_mocked();
+
+            let result = client.get_json::<ApiResult<()>>("new_route");
+
+            mock.assert();
+            result.unwrap();
+        }
+    }
+
+    mod post_json {
+        use super::*;
+
+        #[test]
+        fn returns_all_sheets() {
+            let mock = mockito::mock("POST", "/new_route")
+                .match_header("authorization", "Bearer TEST_TOKEN")
+                .match_header("content-type", "application/json")
+                .match_body(Matcher::Json(json!({
+                        "key": "value"
+                    })))
+                .with_body(json!({
+                        "result": null
+                    }).to_string())
+                .create();
+            let client = Client::new_mocked();
+
+            let result = client.post_json::<_, ApiResult<()>>("new_route", &json!({
+                    "key": "value"
+                }));
+
+            mock.assert();
+            result.unwrap();
+        }
+    }
+
+    mod fetch_json {
+        use super::*;
+        use serde_json::Value;
+
+        fn create_sheets_mock(with_status: usize, with_body: Value) -> Mock {
             mockito::mock("GET", "/sheets?includeAll=true")
                 .match_header("authorization", "Bearer TEST_TOKEN")
                 .with_status(with_status)
-                .with_body(with_body)
+                .with_body(with_body.to_string())
                 .create()
         }
 
@@ -79,20 +183,20 @@ mod tests {
 
             #[test]
             fn then_returns_dto() {
-                let mock = create_sheets_mock(200, r#"{
+                let mock = create_sheets_mock(200, json!({
                         "data": [
                             {
                                 "id": 123,
                                 "name": "my_sheet"
                             }
                         ]
-                    }"#);
+                    }));
                 let client = Client::new_mocked();
 
                 let result = client.fetch_sheets();
 
                 mock.assert();
-                let _: IndexResult<SheetForList> = result.unwrap();
+                assert!(result.is_ok());
             }
         }
 
@@ -101,10 +205,10 @@ mod tests {
 
             #[test]
             fn then_returns_error() {
-                let mock = create_sheets_mock(500, r#"{
+                let mock = create_sheets_mock(500, json!({
                         "errorCode": 4004,
                         "message": "Test error"
-                    }"#);
+                    }));
                 let client = Client::new_mocked();
 
                 let result = client.fetch_sheets();
@@ -124,16 +228,16 @@ mod tests {
 
             #[test]
             fn then_returns_error() {
-                let mock = create_sheets_mock(200, r#"{
+                let mock = create_sheets_mock(200, json!({
                         "Unexpected": "data"
-                    }"#);
+                    }));
                 let client = Client::new_mocked();
 
                 let result = client.fetch_sheets();
 
                 mock.assert();
                 let actual = result.unwrap_err();
-                let expected = ResError::InvalidJson("missing field `data` at line 3 column 21".to_string());
+                let expected = ResError::InvalidJson("missing field `data` at line 1 column 21".to_string());
                 assert_eq!(expected, actual);
             }
         }
